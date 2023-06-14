@@ -15,4 +15,6 @@ pub enum SbMsg {
     ToOut(to::Out),
     ToCmd(to::Command),
     WifiOut(wifi::Out),
+    TcpOut(tcp::Out),
+    ExampleOut(example::Out),
 }
