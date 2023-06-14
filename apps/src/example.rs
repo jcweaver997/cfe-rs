@@ -1,10 +1,16 @@
-use crate::{libs::msg_queue::MsgOut, perf::PerfData, sch};
+use crate::{libs::msg_queue::MsgOut, perf::PerfData, sch, to};
 use lazy_static::lazy_static;
-use log::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Out {
     pub perf: PerfData,
+    pub counter: u32,
+}
+
+#[derive(Debug, Default)]
+struct Data {
+    out: Out,
 }
 
 lazy_static! {
@@ -12,13 +18,13 @@ lazy_static! {
 }
 
 pub fn start() {
-    let mut out = Out::default();
+    let mut data = Data::default();
     let notifier = sch::SCH1HZ.subscribe();
     loop {
         notifier.wait();
-        out.perf.enter();
-
-        info!("{}", out.perf);
-        out.perf.exit();
+        data.out.perf.enter();
+        to::SEND_QUEUE.push(crate::SbMsg::ExampleOut(data.out));
+        data.out.counter += 1;
+        data.out.perf.exit();
     }
 }
