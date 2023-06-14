@@ -8,7 +8,7 @@ use std::{
 use crate::{
     libs::msg_queue::{MsgOut, MsgQueue},
     perf::PerfData,
-    sch,
+    sch, to,
 };
 use lazy_static::lazy_static;
 use log::*;
@@ -24,10 +24,17 @@ pub enum Command {
     Disable,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Out {
     pub perf: PerfData,
     pub counter: u32,
+    pub rx_bytes: u32,
+    pub tx_bytes: u32,
+}
+
+#[derive(Debug, Default)]
+struct Data {
+    out: Out,
 }
 
 pub const UNIT_SIZE: usize = 4096;
@@ -47,7 +54,7 @@ pub struct Init {
 pub fn start(init: Init) {
     let notifier = sch::SCH25HZ.subscribe();
 
-    let mut out = Out::default();
+    let mut data = Data::default();
     let mut read_buf = [0u8; UNIT_SIZE];
 
     let mut socket = None;
@@ -59,7 +66,7 @@ pub fn start(init: Init) {
     let send_peer: Arc<Mutex<Option<TcpStream>>> = Arc::new(Mutex::new(None));
     loop {
         notifier.wait();
-        out.perf.enter();
+        data.out.perf.enter();
 
         for cmd in CMD_QUEUE.lock().pop_iter() {
             info!("got cmd {:?}", cmd);
@@ -88,11 +95,12 @@ pub fn start(init: Init) {
                 let mut peer = send_peer.lock();
                 if let Some(s) = &mut *peer {
                     if buf.len() > 0 {
-                        if let Err(e) =
-                            s.write(&buf.pop_iter().take(UNIT_SIZE).collect::<Vec<u8>>())
-                        {
-                            error!("{e}");
-                            peer.take().unwrap();
+                        match s.write(&buf.pop_iter().take(UNIT_SIZE).collect::<Vec<u8>>()) {
+                            Err(e) => {
+                                error!("{e}");
+                                peer.take().unwrap();
+                            }
+                            Ok(s) => data.out.tx_bytes = s as u32,
                         }
                     }
                 }
@@ -114,6 +122,7 @@ pub fn start(init: Init) {
             if let Some(c) = &mut listen_peer {
                 match c.read(&mut read_buf) {
                     Ok(s) => {
+                        data.out.rx_bytes += s as u32;
                         RX_BUF.send_slice(&read_buf[0..s]);
                     }
                     Err(e) => {
@@ -125,6 +134,8 @@ pub fn start(init: Init) {
                 }
             }
         }
-        out.perf.exit();
+        to::SEND_QUEUE.push(crate::SbMsg::TcpOut(data.out));
+        data.out.counter += 1;
+        data.out.perf.exit();
     }
 }
