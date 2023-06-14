@@ -9,3 +9,8 @@ edition = "2021"
 log = { version = "0.4.18", features = ["serde"] }
 simple-log = "1.6.0"
 apps = { path = "./apps" }
+rerun = { version = "0.6.0", features = ["web_viewer"] }
+lazy_static = "1.4.0"
+ringbuf = "0.3.3"
+serde = "1.0.164"
+serde_json = "1.0.96"
