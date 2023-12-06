@@ -25,6 +25,7 @@ pub fn start() {
         data.out.perf.enter();
         to::SEND_QUEUE.push(crate::SbMsg::ExampleOut(data.out));
         data.out.counter += 1;
+        println!("data {:?}", data.out);
         data.out.perf.exit();
     }
 }

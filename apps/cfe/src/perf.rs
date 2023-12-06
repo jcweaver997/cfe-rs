@@ -46,6 +46,7 @@ impl Default for PerfData {
             time_tag: 0.0,
             last_rate: Default::default(),
             last_duration: Default::default(),
+            counter: 0
         }
     }
 }
