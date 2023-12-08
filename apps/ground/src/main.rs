@@ -1,0 +1,118 @@
+use std::time::Duration;
+
+use cfe::{
+    self,
+    msg::{Computer, ExampleOut, SbMsgData, SchOut, RelayOut},
+    sbn::udp::SbUdp,
+    Cfe, CfeConnection, SbApp,
+};
+use log::*;
+use rerun::TimeSeriesScalar;
+use serde_json::Value;
+
+fn sub_all(cfe_con: &mut CfeConnection, computer: Computer) {
+    // cfe_con.subscribe(SbMsgData::ExampleOut(ExampleOut::default()), computer);
+    // cfe_con.subscribe(SbMsgData::SchOut(SchOut::default()), computer);
+    cfe_con.subscribe(SbMsgData::RelayOut(RelayOut::default()), computer);
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    simple_log::quick!("info");
+    let mut ground = Ground {
+        cf: Cfe::init_cfe(Computer::Ground, cfe::msg::AppName::Ground),
+    };
+
+    let mut udp_con = CfeConnection::new(Box::new(SbUdp::new(
+        "0.0.0.0:51001".parse()?,
+        "127.0.0.1:50001".parse()?,
+    )?));
+
+    sub_all(&mut udp_con, Computer::Flight);
+    sub_all(&mut udp_con, Computer::Payload);
+    ground.cf.add_connection(udp_con);
+    ground.run();
+    return Ok(());
+}
+
+struct Ground {
+    cf: Cfe,
+}
+
+impl cfe::SbApp for Ground {
+    fn init(&mut self) {
+        info!("starting {:?}", self.cf.app_name);
+    }
+    fn start(&mut self) {
+        let recording = rerun::RecordingStreamBuilder::new("MMouse")
+            .connect_opts(
+                "172.24.96.1:9876".parse().expect("failed to resolve"),
+                Some(Duration::from_secs_f32(1.0)),
+            )
+            .unwrap();
+        loop {
+            let msg = self.cf.recv_message(true);
+            if let Some(msg) = msg {
+                info!("got msg {:?}", msg);
+                let Ok(json_msg) = serde_json::to_string(&msg) else {
+                    continue;
+                };
+                let Ok(json_obj) = serde_json::from_str::<Value>(&json_msg) else {
+                    continue;
+                };
+                let flattened = flatten(String::new(), json_obj);
+                info!("flat {:?}", flattened);
+
+                for p in flattened {
+                    match p.1 {
+                        Value::Bool(b) => {
+                            recording
+                                .log(
+                                    format!("{:?}/{}", msg.computer, p.0[5..].to_string()),
+                                    &TimeSeriesScalar::new(if b { 1.0 } else { 0.0 }),
+                                )
+                                .expect("failed to log");
+                        }
+                        Value::Number(n) => {
+                            recording
+                                .log(
+                                    format!("{:?}/{}", msg.computer, p.0[5..].to_string()),
+                                    &TimeSeriesScalar::new(n.as_f64().unwrap()),
+                                )
+                                .expect("failed to log");
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn flatten(p: String, v: Value) -> Vec<(String, Value)> {
+    match v {
+        Value::Bool(x) => return vec![(p, Value::Bool(x))],
+        Value::Number(x) => return vec![(p, Value::Number(x))],
+        Value::Object(o) => {
+            let mut r = Vec::new();
+            for obj in o {
+                let path = if p.len() == 0 {
+                    obj.0
+                } else {
+                    format!("{}/{}", p, obj.0)
+                };
+                r.extend(flatten(path, obj.1));
+            }
+            return r;
+        },
+        Value::Array(a) => {
+            let mut r = Vec::new();
+            for i in 0..a.len() {
+                let path = format!("{}/{}", p, i);
+                r.extend(flatten(path, a[i].clone()));
+            }
+            return r;
+        }
+        _ => {}
+    }
+    return Vec::new();
+}

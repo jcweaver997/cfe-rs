@@ -1,13 +1,20 @@
 [package]
-name = "cfe-rs"
+name = "relay"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "flight"
+path = "src/relay_flight.rs"
+
+[[bin]]
+name = "payload"
+path = "src/relay_payload.rs"
+
+
 [dependencies]
 log = { version = "0.4.18", features = ["serde"] }
+cfe = { path = "../cfe"}
 simple-log = "1.6.0"
-apps = { path = "./apps" }
-libc = "0.2.150"
-epoll = "4.3.3"

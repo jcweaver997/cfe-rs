@@ -1,4 +1,4 @@
-use std::{net::{SocketAddr, UdpSocket}, io::ErrorKind, os::fd::{RawFd, AsRawFd}};
+use std::{io::ErrorKind, net::{SocketAddr, UdpSocket}, os::fd::{RawFd, AsRawFd}};
 
 use log::*;
 
@@ -10,10 +10,12 @@ pub struct SbUdp {
 }
 
 impl SbUdp {
-    pub fn new(udp: UdpSocket, remote_addr: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(bind_addr: SocketAddr, remote_addr: SocketAddr) -> Result<Self, Box<dyn std::error::Error>> {
+        let udp = UdpSocket::bind(bind_addr)?;
+        udp.set_nonblocking(true)?;
         return Ok(Self {
-            remote_addr: remote_addr.parse()?,
-            udp,
+            remote_addr: remote_addr,
+            udp
         });
     }
 }
@@ -25,6 +27,7 @@ impl TCfeConnection for SbUdp {
             return;
         }
         trace!("sending udp msg len {}", msg.len());
+        
         if let Err(e) = self.udp.send_to(msg, self.remote_addr) {
             error!("received udp send error {}", e);
         }
@@ -47,7 +50,7 @@ impl TCfeConnection for SbUdp {
         return Vec::new();
     }
 
-    fn get_fd(&self) -> RawFd {
-        return self.udp.as_raw_fd()
+    fn get_fd(&mut self) -> RawFd {
+        self.udp.as_raw_fd()
     }
 }
