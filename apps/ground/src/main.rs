@@ -2,24 +2,25 @@ use std::time::Duration;
 
 use cfe::{
     self,
-    msg::{Computer, ExampleOut, SbMsgData, SchOut, RelayOut},
+    msg::{Computer, ExampleOut, SbMsgData, SchOut, RelayOut, EventSeverity, SbEvent},
     sbn::udp::SbUdp,
     Cfe, CfeConnection, SbApp,
 };
-use log::*;
 use rerun::TimeSeriesScalar;
 use serde_json::Value;
 
 fn sub_all(cfe_con: &mut CfeConnection, computer: Computer) {
+    cfe_con.subscribe(SbMsgData::ErrorMsg(SbEvent::None), computer);
+    cfe_con.subscribe(SbMsgData::WarnMsg(SbEvent::None), computer);
+    cfe_con.subscribe(SbMsgData::InfoMsg(SbEvent::None), computer);
     // cfe_con.subscribe(SbMsgData::ExampleOut(ExampleOut::default()), computer);
     // cfe_con.subscribe(SbMsgData::SchOut(SchOut::default()), computer);
-    cfe_con.subscribe(SbMsgData::RelayOut(RelayOut::default()), computer);
+    // cfe_con.subscribe(SbMsgData::RelayOut(RelayOut::default()), computer);
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    simple_log::quick!("info");
     let mut ground = Ground {
-        cf: Cfe::init_cfe(Computer::Ground, cfe::msg::AppName::Ground),
+        cf: Cfe::init_cfe(Computer::Ground, cfe::msg::AppName::Ground, cfe::msg::EventSeverity::Info),
     };
 
     let mut udp_con = CfeConnection::new(Box::new(SbUdp::new(
@@ -40,7 +41,7 @@ struct Ground {
 
 impl cfe::SbApp for Ground {
     fn init(&mut self) {
-        info!("starting {:?}", self.cf.app_name);
+        self.cf.log(SbEvent::AppInit, EventSeverity::Info, &format!("App {:?} initialized", self.cf.app_name));
     }
     fn start(&mut self) {
         let recording = rerun::RecordingStreamBuilder::new("MMouse")
@@ -52,7 +53,7 @@ impl cfe::SbApp for Ground {
         loop {
             let msg = self.cf.recv_message(true);
             if let Some(msg) = msg {
-                info!("got msg {:?}", msg);
+                self.cf.log(SbEvent::None, EventSeverity::Info, &format!("got msg {:?}", msg));
                 let Ok(json_msg) = serde_json::to_string(&msg) else {
                     continue;
                 };
@@ -60,7 +61,6 @@ impl cfe::SbApp for Ground {
                     continue;
                 };
                 let flattened = flatten(String::new(), json_obj);
-                info!("flat {:?}", flattened);
 
                 for p in flattened {
                     match p.1 {

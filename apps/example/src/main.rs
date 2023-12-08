@@ -1,15 +1,13 @@
 use cfe::{
     self,
-    msg::{Computer, ExampleOut, SbMsgData, SchOut},
+    msg::{Computer, ExampleOut, SbMsgData, EventSeverity, SbEvent},
     sbn::unix::SbUnix,
     Cfe, CfeConnection, SbApp,
 };
-use log::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    simple_log::quick!("info");
     let mut example = Example {
-        cf: Cfe::init_cfe(Computer::Payload, cfe::msg::AppName::Example),
+        cf: Cfe::init_cfe(Computer::Payload, cfe::msg::AppName::Example, cfe::msg::EventSeverity::Info),
         out: ExampleOut::default(),
     };
     let relay = SbUnix::new("/tmp/pl-example.sock", "/tmp/pl-relay-example.sock")?;
@@ -27,7 +25,7 @@ struct Example {
 
 impl cfe::SbApp for Example {
     fn init(&mut self) {
-        info!("starting {:?}", self.cf.app_name);
+        self.cf.log(SbEvent::AppInit, EventSeverity::Info, &format!("App {:?} initialized", self.cf.app_name));
     }
     fn start(&mut self) {
         loop {
@@ -35,7 +33,7 @@ impl cfe::SbApp for Example {
             if let Some(msg) = msg {
                 match msg.data {
                     SbMsgData::Sch1Hz => {
-                        info!("got msg {:?}", msg);
+                        self.cf.log(SbEvent::ExampleRun, EventSeverity::Info, &format!("got msg {:?}", msg));
                         self.out.perf.enter();
 
                         self.cf

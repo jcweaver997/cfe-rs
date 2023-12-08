@@ -8,8 +8,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+use chrono::Utc;
+use colored::Colorize;
 use log::*;
-use msg::{AppName, Computer, SbMsg, SbMsgData, SbSubReq};
+use msg::{Computer, EventSeverity, SbEvent, SbMsg, SbMsgData, SbSubReq};
 
 const HEARTBEAT_DELAY: f32 = 1.0;
 const MAX_HEARTBEAT_MISS: u32 = 3;
@@ -30,8 +32,7 @@ pub struct CfeConnection {
     pub computer: msg::Computer,
     pub app_name: msg::AppName,
     pub send_seq: u16,
-    pub recv_seq: u16,
-    pub extra_posts: HashSet<(u64, Computer)>
+    pub recv_seq: Option<u16>,
 }
 
 impl CfeConnection {
@@ -40,14 +41,13 @@ impl CfeConnection {
             con: connection,
             requested_subs: HashSet::new(),
             posts: HashSet::new(),
-            last_heartbeat_sent: Instant::now() - Duration::from_secs(10000),
-            last_heartbeat_received: Instant::now() - Duration::from_secs(10000),
+            last_heartbeat_sent: Instant::now() - Duration::from_secs_f32(HEARTBEAT_DELAY),
+            last_heartbeat_received: Instant::now() - Duration::from_secs_f32(HEARTBEAT_DELAY),
             computer: Computer::None,
             connected: false,
             app_name: msg::AppName::None,
             send_seq: 0,
-            recv_seq: 0,
-            extra_posts: HashSet::new()
+            recv_seq: None
         };
     }
 
@@ -66,75 +66,9 @@ impl CfeConnection {
 
     pub fn subscribe(&mut self, t: SbMsgData, computer: Computer) {
         let i: u64 = t.get_id();
-        trace!("Adding {} to requested subscriptions", i);
         self.requested_subs.insert((i, computer));
     }
 
-    pub fn send_subs(
-        &mut self,
-        computer: Computer,
-        app_name: AppName,
-    ) {
-        let mut subs = self.requested_subs.clone();
-        subs.extend(self.extra_posts.iter());
-        let data = msg::SbMsgData::SbSubReq(msg::SbSubReq { subs });
-        let msg = SbMsg {
-            data,
-            computer,
-            app_name,
-            sequence: self.send_seq,
-        };
-        if let Ok(v) = msg.serialize() {
-            let desc: u64 = msg.data.get_id();
-            self.send_message(&v, desc, computer);
-        } else {
-            error!("failed to serialize msg {:?}", msg);
-        }
-    }
-
-    pub fn heartbeat(&mut self, computer: Computer, app_name: AppName) {
-        let now = Instant::now();
-        if now.duration_since(self.last_heartbeat_sent).as_secs_f32() >= HEARTBEAT_DELAY {
-            self.last_heartbeat_sent = now;
-            let msg = SbMsg {
-                data: SbMsgData::None,
-                computer,
-                app_name,
-                sequence: self.send_seq,
-            };
-            self.send_message(
-                &msg.serialize().expect("failed to serialize heartbeat"),
-                SbMsgData::None.get_id(),
-                computer,
-            );
-        }
-        if now
-            .duration_since(self.last_heartbeat_received)
-            .as_secs_f32()
-            >= HEARTBEAT_DELAY * MAX_HEARTBEAT_MISS as f32
-        {
-            if self.connected {
-                self.connected = false;
-                warn!(
-                    "heartbeat lost from {:?}.{:?}",
-                    self.computer, self.app_name
-                );
-            }
-        }
-    }
-
-    pub fn heartbeat_received(&mut self, msg: SbMsg) {
-        self.last_heartbeat_received = Instant::now();
-        self.computer = msg.computer;
-        self.app_name = msg.app_name;
-        if !self.connected {
-            self.connected = true;
-            info!(
-                "heartbeat started from {:?}.{:?}",
-                self.computer, self.app_name
-            );
-        }
-    }
 }
 
 pub struct Cfe {
@@ -144,6 +78,7 @@ pub struct Cfe {
     pub computer: msg::Computer,
     pub app_name: msg::AppName,
     pub relay: bool,
+    pub log_level: EventSeverity,
 }
 
 pub trait SbApp {
@@ -157,7 +92,11 @@ pub trait SbApp {
 }
 
 impl Cfe {
-    pub fn init_cfe(computer: msg::Computer, app_name: msg::AppName) -> Cfe {
+    pub fn init_cfe(
+        computer: msg::Computer,
+        app_name: msg::AppName,
+        log_level: EventSeverity,
+    ) -> Cfe {
         let cf = Cfe {
             connections: Vec::new(),
             poll: epoll::create(false).expect("failed to create epoll"),
@@ -165,7 +104,10 @@ impl Cfe {
             computer,
             app_name,
             relay: false,
+            log_level,
         };
+        simple_log::quick!("info");
+
         info!("CFE Initialized");
         return cf;
     }
@@ -181,8 +123,8 @@ impl Cfe {
             },
         )
         .expect("Failed to add connection to epoll");
-        connection.send_subs(self.computer, self.app_name);
         self.connections.push(connection);
+        self.send_subs(self.connections.len() - 1);
         self.poll();
     }
 
@@ -198,9 +140,25 @@ impl Cfe {
             if let Ok(v) = msg.serialize() {
                 con.send_message(&v, desc, self.computer);
             } else {
-                error!("failed to serialize msg {:?}", msg);
+                self.log(SbEvent::SerializeError, EventSeverity::Error, &format!("failed to serialize msg {:?}", msg));
                 return;
             }
+        }
+    }
+
+    pub fn send_message_to(&mut self, data: msg::SbMsgData, i: usize) {
+        let msg = SbMsg {
+            data: data.clone(),
+            computer: self.computer,
+            app_name: self.app_name,
+            sequence: self.connections[i].send_seq,
+        };
+        let desc: u64 = msg.data.get_id();
+        if let Ok(v) = msg.serialize() {
+            self.connections[i].send_message(&v, desc, self.computer);
+        } else {
+            self.log(SbEvent::SerializeError, EventSeverity::Error, &format!("failed to serialize msg {:?}", msg));
+            return;
         }
     }
 
@@ -215,23 +173,24 @@ impl Cfe {
             ) {
                 Ok(s) => {
                     if s > 0 {
-                        // self.connections[self.poll_events[0].data as usize].recv_message()
+                        con_i = self.poll_events[0].data as usize;
+                        self.connections[self.poll_events[0].data as usize].recv_message()
 
-                        let mut v = Vec::new();
-                        for i in 0..self.connections.len() {
-                            v = self.connections[i].recv_message();
-                            if v.len() > 0 {
-                                con_i = i;
-                                break;
-                            }
-                        }
-                        v
+                        // let mut v = Vec::new();
+                        // for i in 0..self.connections.len() {
+                        //     v = self.connections[i].recv_message();
+                        //     if v.len() > 0 {
+                        //         con_i = i;
+                        //         break;
+                        //     }
+                        // }
+                        // v
                     } else {
                         Vec::new()
                     }
                 }
                 Err(e) => {
-                    error!("poll error {e}");
+                    self.log(SbEvent::PollError, EventSeverity::Error, &format!("poll error {e}"));
                     Vec::new()
                 }
             }
@@ -250,32 +209,47 @@ impl Cfe {
         if v.len() > 0 {
             match SbMsg::deserialize(&v) {
                 Ok(mut m) => {
-                    if self.connections[con_i].recv_seq + 1 != m.sequence {
-                        if m.sequence == 0 {
-                            self.connections[con_i].send_subs(self.computer, self.app_name);
-                        }else{
-                            error!(
-                                "got mismatched sequence number from {:?}.{:?}, expected {} got {}",
+                    if let Some(seq) = self.connections[con_i].recv_seq {
+                        if seq + 1 != m.sequence {
+                            if m.sequence == 0 {
+                                self.send_subs(con_i);
+                            } else {
+                                self.log(SbEvent::SequenceCountError, EventSeverity::Error, &format!("got mismatched sequence number from {:?}.{:?}, expected {} got {}",
                                 self.connections[con_i].computer,
                                 self.connections[con_i].app_name,
-                                self.connections[con_i].recv_seq + 1,
-                                m.sequence
-                            );
+                                seq + 1,
+                                m.sequence));
+                            }
                         }
-
                     }
-                    self.connections[con_i].recv_seq = m.sequence;
 
+                    self.connections[con_i].recv_seq = Some(m.sequence);
 
                     match m.data {
                         SbMsgData::SbSubReq(req) => {
-                            self.connections[con_i].posts = req.subs;
+                            self.connections[con_i].posts = req.subs.clone();
+                            if self.relay {
+                                for c in 0..self.connections.len() {
+                                    if c == con_i {
+                                        continue;
+                                    }
+                                    
+                                    self.send_subs(c);
+                                }
+                            }
                         }
                         SbMsgData::None => {
                             if !self.connections[con_i].connected {
-                                self.connections[con_i].send_subs(self.computer, self.app_name);
+                                self.send_subs(con_i);
                             }
-                            self.connections[con_i].heartbeat_received(m);
+                            self.connections[con_i].last_heartbeat_received = Instant::now();
+                            self.connections[con_i].computer = m.computer;
+                            self.connections[con_i].app_name = m.app_name;
+                            if !self.connections[con_i].connected {
+                                self.connections[con_i].connected = true;
+                                self.log(SbEvent::HeartBeatStarted, EventSeverity::Info, &format!("heartbeat started from {:?}.{:?}",
+                                self.connections[con_i].computer, self.connections[con_i].app_name));
+                            }
                         }
                         _ => {
                             if self.relay {
@@ -293,9 +267,8 @@ impl Cfe {
                                             m.computer,
                                         );
                                     } else {
-                                        error!("failed to serialize msg {:?}", m);
+                                        self.log(SbEvent::SerializeError, EventSeverity::Error, &format!("failed to serialize msg {:?}", m));
                                     }
-
                                 }
                             }
                             return Some(m);
@@ -303,7 +276,7 @@ impl Cfe {
                     }
                 }
                 Err(e) => {
-                    error!("failed to deserialize packet {}", e);
+                    self.log(SbEvent::DeserializeError, EventSeverity::Error, &format!("failed to deserialize packet {}", e));
                     return None;
                 }
             }
@@ -313,17 +286,72 @@ impl Cfe {
     }
 
     pub fn poll(&mut self) {
-        let mut all_posts: HashSet<(u64, Computer)> = HashSet::new();
-        if self.relay {
-            for con in &mut self.connections {
-                all_posts.extend(con.posts.iter());
+        self.heartbeat();
+    }
+
+    pub fn heartbeat(&mut self) {
+        let now = Instant::now();
+        for i in 0..self.connections.len() {
+            if now
+                .duration_since(self.connections[i].last_heartbeat_sent)
+                .as_secs_f32()
+                >= HEARTBEAT_DELAY
+            {
+                self.connections[i].last_heartbeat_sent = now;
+                self.send_message_to(SbMsgData::None, i);
             }
-            for con in &mut self.connections {
-                con.extra_posts = all_posts.clone();
+            if now
+                .duration_since(self.connections[i].last_heartbeat_received)
+                .as_secs_f32()
+                >= HEARTBEAT_DELAY * MAX_HEARTBEAT_MISS as f32
+            {
+                if self.connections[i].connected {
+                    self.connections[i].connected = false;
+                    self.log(SbEvent::HeartBeatStopped, EventSeverity::Warn, &format!("heartbeat lost from {:?}.{:?}",
+                    self.computer, self.app_name));
+                }
             }
         }
-        for con in &mut self.connections {
-            con.heartbeat(self.computer, self.app_name);
+    }
+
+    pub fn send_subs(&mut self, i: usize) {
+        let mut subs = self.connections[i].requested_subs.clone();
+        if self.relay {
+            for con_i in 0..self.connections.len() {
+                subs.extend(self.connections[con_i].posts.clone());
+            }
+        }
+        let data = msg::SbMsgData::SbSubReq(msg::SbSubReq { subs });
+        self.send_message_to(data, i);
+    }
+
+    pub fn log(&mut self, event: SbEvent, severity: EventSeverity, text: &str) {
+        let time = Utc::now()
+            .naive_utc()
+            .format("%Y-%m-%d %H:%M:%S%.3f")
+            .to_string();
+        match severity {
+            EventSeverity::Trace if self.log_level <= EventSeverity::Trace => {
+                self.send_message(SbMsgData::TraceMsg(event.clone()));
+                println!("{} [{}] {}", time, "TRACE".bright_black(), text);
+            }
+            EventSeverity::Debug if self.log_level <= EventSeverity::Debug => {
+                self.send_message(SbMsgData::DebugMsg(event.clone()));
+                println!("{} [{}] {}", time, "DEBUG".bright_cyan(), text);
+            }
+            EventSeverity::Info if self.log_level <= EventSeverity::Info => {
+                self.send_message(SbMsgData::InfoMsg(event.clone()));
+                println!("{} [{}] {}", time, "INFO".blue(), text);
+            }
+            EventSeverity::Warn if self.log_level <= EventSeverity::Warn => {
+                self.send_message(SbMsgData::WarnMsg(event.clone()));
+                println!("{} [{}] {}", time, "WARN".yellow(), text);
+            }
+            EventSeverity::Error if self.log_level <= EventSeverity::Error => {
+                self.send_message(SbMsgData::ErrorMsg(event.clone()));
+                println!("{} [{}] {}", time, "ERROR".red(), text);
+            }
+            _ => {}
         }
     }
 }

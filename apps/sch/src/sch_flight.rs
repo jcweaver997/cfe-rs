@@ -8,9 +8,8 @@ mod sch;
 use crate::sch::Sch;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    simple_log::quick!("info");
     let mut sch = Sch {
-        cf: cfe::Cfe::init_cfe(msg::Computer::Flight, msg::AppName::Sch),
+        cf: cfe::Cfe::init_cfe(msg::Computer::Flight, msg::AppName::Sch, msg::EventSeverity::Info),
         out: cfe::msg::SchOut::default(),
     };
     let relay = SbUnix::new("/tmp/fl-sch.sock", "/tmp/fl-relay-sch.sock")?;

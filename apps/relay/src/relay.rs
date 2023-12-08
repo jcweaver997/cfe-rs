@@ -1,5 +1,4 @@
-use cfe::{Cfe, msg::{SbMsgData, RelayOut, RelayOutConnectionStatus}};
-use log::*;
+use cfe::{Cfe, msg::{SbMsgData, RelayOut, RelayOutConnectionStatus, EventSeverity, SbEvent}};
 
 pub struct Relay {
     pub cf: Cfe,
@@ -7,7 +6,7 @@ pub struct Relay {
 
 impl cfe::SbApp for Relay {
     fn init(&mut self) {
-        info!("starting Relay");
+        self.cf.log(SbEvent::AppInit, EventSeverity::Info, &format!("App {:?} initialized", self.cf.app_name));
     }
     fn start(&mut self) {
         loop {

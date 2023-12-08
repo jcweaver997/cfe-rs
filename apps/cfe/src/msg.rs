@@ -23,9 +23,18 @@ pub enum AppName{
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub enum ErrorMsg{
+pub enum SbEvent{
     #[default]
-    None
+    None,
+    AppInit,
+    SchBroke(u32),
+    HeartBeatStarted,
+    HeartBeatStopped,
+    SerializeError,
+    DeserializeError,
+    PollError,
+    SequenceCountError,
+    ExampleRun
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -42,8 +51,22 @@ pub enum SbMsgData {
     Sch1Hz,
     ExampleOut(ExampleOut),
     RelayOut(RelayOut),
-    ErrorMsg
+    ErrorMsg(SbEvent),
+    WarnMsg(SbEvent),
+    InfoMsg(SbEvent),
+    DebugMsg(SbEvent),
+    TraceMsg(SbEvent),
 
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub enum EventSeverity {
+    #[default]
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error
 }
 
 impl SbMsgData {

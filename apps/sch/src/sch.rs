@@ -3,8 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use cfe::msg::SbMsgData;
-use log::*;
+use cfe::msg::{SbMsgData, SbEvent, EventSeverity};
 
 pub struct Sch {
     pub cf: cfe::Cfe,
@@ -13,7 +12,7 @@ pub struct Sch {
 
 impl cfe::SbApp for Sch {
     fn init(&mut self) {
-        info!("starting SCH");
+        self.cf.log(SbEvent::AppInit, EventSeverity::Info, &format!("App {:?} initialized", self.cf.app_name));
     }
     fn start(&mut self) {
         let interval = Duration::from_millis(10);
@@ -27,7 +26,7 @@ impl cfe::SbApp for Sch {
                     next_time += interval;
                     skipped += 1;
                 }
-                warn!("sch behind, skipping {} cycles", skipped);
+                self.cf.log(SbEvent::SchBroke(skipped), EventSeverity::Warn, &format!("sch behind, skipping {} cycles", skipped));
             }
             park_timeout(next_time - now);
 

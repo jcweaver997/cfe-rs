@@ -9,9 +9,8 @@ use crate::relay::Relay;
 mod relay;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    simple_log::quick!("info");
     let mut relay = Relay {
-        cf: Cfe::init_cfe(Computer::Payload, AppName::Relay),
+        cf: Cfe::init_cfe(Computer::Payload, AppName::Relay, cfe::msg::EventSeverity::Info),
     };
     relay.cf.relay = true;
 
