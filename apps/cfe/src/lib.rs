@@ -247,7 +247,7 @@ impl Cfe {
                             self.connections[con_i].app_name = m.app_name;
                             if !self.connections[con_i].connected {
                                 self.connections[con_i].connected = true;
-                                self.log(SbEvent::HeartBeatStarted, EventSeverity::Info, &format!("heartbeat started from {:?}.{:?}",
+                                self.log(SbEvent::HeartBeatStarted((self.connections[con_i].computer, self.connections[con_i].app_name)), EventSeverity::Info, &format!("heartbeat started from {:?}.{:?}",
                                 self.connections[con_i].computer, self.connections[con_i].app_name));
                             }
                         }
@@ -307,7 +307,7 @@ impl Cfe {
             {
                 if self.connections[i].connected {
                     self.connections[i].connected = false;
-                    self.log(SbEvent::HeartBeatStopped, EventSeverity::Warn, &format!("heartbeat lost from {:?}.{:?}",
+                    self.log(SbEvent::HeartBeatStopped((self.connections[i].computer, self.connections[i].app_name)), EventSeverity::Warn, &format!("heartbeat lost from {:?}.{:?}",
                     self.computer, self.app_name));
                 }
             }
