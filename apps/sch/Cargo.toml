@@ -13,5 +13,9 @@ path = "src/sch_flight.rs"
 name = "payload"
 path = "src/sch_payload.rs"
 
+[lib]
+name = "sch"
+path = "src/sch.rs"
+
 [dependencies]
-cfe = { path = "../cfe"}
+cfe = { path = "../../libs/cfe"}

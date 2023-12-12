@@ -71,7 +71,8 @@ pub enum EventSeverity {
 
 impl SbMsgData {
     pub fn get_id(&self) -> u64{
-        return unsafe { std::mem::transmute(std::mem::discriminant(self)) };
+        let i: usize = unsafe { std::mem::transmute(std::mem::discriminant(self)) };
+        return i as u64;
     }
 
 }

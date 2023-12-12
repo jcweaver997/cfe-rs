@@ -14,5 +14,9 @@ name = "payload"
 path = "src/relay_payload.rs"
 
 
+[lib]
+name = "relay"
+path = "src/relay.rs"
+
 [dependencies]
-cfe = { path = "../cfe"}
+cfe = { path = "../../libs/cfe"}

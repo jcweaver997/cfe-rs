@@ -14,7 +14,7 @@ fn sub_all(cfe_con: &mut CfeConnection, computer: Computer) {
     cfe_con.subscribe(SbMsgData::WarnMsg(SbEvent::None), computer);
     cfe_con.subscribe(SbMsgData::InfoMsg(SbEvent::None), computer);
     // cfe_con.subscribe(SbMsgData::ExampleOut(ExampleOut::default()), computer);
-    // cfe_con.subscribe(SbMsgData::SchOut(SchOut::default()), computer);
+    cfe_con.subscribe(SbMsgData::SchOut(SchOut::default()), computer);
     // cfe_con.subscribe(SbMsgData::RelayOut(RelayOut::default()), computer);
 }
 

@@ -28,7 +28,7 @@ impl cfe::SbApp for Sch {
                 }
                 self.cf.log(SbEvent::SchBroke(skipped), EventSeverity::Warn, &format!("sch behind, skipping {} cycles", skipped));
             }
-            park_timeout(next_time - now);
+            park_timeout((next_time - now) / 2);
 
             self.out.perf.enter();
             self.cf.send_message(SbMsgData::Sch100Hz);
