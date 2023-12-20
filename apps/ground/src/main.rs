@@ -6,7 +6,6 @@ use cfe::{
     sbn::udp::SbUdp,
     Cfe, CfeConnection, SbApp,
 };
-use rerun::TimeSeriesScalar;
 use serde_json::Value;
 
 fn sub_all(cfe_con: &mut CfeConnection, computer: Computer) {
@@ -44,12 +43,6 @@ impl cfe::SbApp for Ground {
         self.cf.log(SbEvent::AppInit, EventSeverity::Info, &format!("App {:?} initialized", self.cf.app_name));
     }
     fn start(&mut self) {
-        let recording = rerun::RecordingStreamBuilder::new("MMouse")
-            .connect_opts(
-                "172.24.96.1:9876".parse().expect("failed to resolve"),
-                Some(Duration::from_secs_f32(1.0)),
-            )
-            .unwrap();
         loop {
             let msg = self.cf.recv_message(true);
             if let Some(msg) = msg {
@@ -61,28 +54,6 @@ impl cfe::SbApp for Ground {
                     continue;
                 };
                 let flattened = flatten(String::new(), json_obj);
-
-                for p in flattened {
-                    match p.1 {
-                        Value::Bool(b) => {
-                            recording
-                                .log(
-                                    format!("{:?}/{}", msg.computer, p.0[5..].to_string()),
-                                    &TimeSeriesScalar::new(if b { 1.0 } else { 0.0 }),
-                                )
-                                .expect("failed to log");
-                        }
-                        Value::Number(n) => {
-                            recording
-                                .log(
-                                    format!("{:?}/{}", msg.computer, p.0[5..].to_string()),
-                                    &TimeSeriesScalar::new(n.as_f64().unwrap()),
-                                )
-                                .expect("failed to log");
-                        }
-                        _ => {}
-                    }
-                }
             }
         }
     }
