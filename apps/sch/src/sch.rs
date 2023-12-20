@@ -1,5 +1,5 @@
 use std::{
-    thread::park_timeout,
+    thread::{park_timeout, sleep},
     time::{Duration, Instant},
 };
 
@@ -28,7 +28,7 @@ impl cfe::SbApp for Sch {
                 }
                 self.cf.log(SbEvent::SchBroke(skipped), EventSeverity::Warn, &format!("sch behind, skipping {} cycles", skipped));
             }
-            park_timeout((next_time - now) / 2);
+            sleep(next_time - now);
 
             self.out.perf.enter();
             self.cf.send_message(SbMsgData::Sch100Hz);
@@ -41,14 +41,16 @@ impl cfe::SbApp for Sch {
             }
             if self.out.perf.counter % 10 == 0 {
                 self.cf.send_message(SbMsgData::Sch10Hz);
+                self.cf.send_message(SbMsgData::SchOut(self.out.clone()));
             }
             if self.out.perf.counter % 20 == 0 {
                 self.cf.send_message(SbMsgData::Sch5Hz);
+                
             }
             if self.out.perf.counter % 100 == 0 {
                 self.cf.send_message(SbMsgData::Sch1Hz);
             }
-            self.cf.send_message(SbMsgData::SchOut(self.out.clone()));
+            
 
             next_time += interval;
             self.out.perf.exit();

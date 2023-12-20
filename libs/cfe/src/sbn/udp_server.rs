@@ -1,4 +1,4 @@
-use std::{io::ErrorKind, net::{SocketAddr, UdpSocket}, sync::{Arc, Mutex, Condvar}, thread::spawn};
+use std::{io::ErrorKind, net::{SocketAddr, UdpSocket}, sync::{Arc, Mutex, Condvar}, thread::spawn, os::fd::{FromRawFd, AsRawFd}};
 
 use log::*;
 use queues::{Buffer, IsQueue};
@@ -74,7 +74,7 @@ impl TCfeConnection for SbUdpServer {
         msg_queue: Arc<(Mutex<Buffer<(SbMsg, usize)>>, Condvar)>,
         token: usize
     ) {
-        let u = self.udp.try_clone().expect("failed to clone unix socket");
+        let u = unsafe {UdpSocket::from_raw_fd(self.udp.as_raw_fd())};
         let remote_addr = self.remote_addr.clone();
         spawn(move || Self::recv_thread(u, msg_queue, remote_addr, token));
     }
