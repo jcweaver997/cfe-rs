@@ -3,6 +3,9 @@ use std::{io::ErrorKind, net::{SocketAddr, UdpSocket}, sync::{Arc, Mutex, Condva
 use log::*;
 use queues::{Buffer, IsQueue};
 
+#[cfg(target_os = "linux")]
+use std::os::fd::{FromRawFd, AsRawFd};
+
 use crate::{TCfeConnection, msg::SbMsg};
 
 pub struct SbUdpServer {
