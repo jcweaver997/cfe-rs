@@ -33,8 +33,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     wifi_driver
         .set_configuration(&Configuration::Client(ClientConfiguration {
-            ssid: "JCAL".into(),
-            password: "F!v3five".into(),
+            ssid: std::env!("WIFI_SSID").into(),
+            password: std::env!("WIFI_PASSWORD").into(),
             ..Default::default()
         }))
         .unwrap();
