@@ -279,7 +279,8 @@ impl Cfe {
                         EventSeverity::Warn,
                         &format!(
                             "heartbeat lost from {:?}.{:?}",
-                            self.computer, self.app_name
+                            self.connections[i].computer,
+                            self.connections[i].app_name
                         ),
                     );
                 }

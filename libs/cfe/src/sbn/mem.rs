@@ -3,6 +3,7 @@ use std::{
     thread::spawn,
 };
 
+use log::error;
 use queues::{Buffer, IsQueue};
 
 use crate::{msg::SbMsg, TCfeConnection};
@@ -38,11 +39,13 @@ impl SbMem {
             } else {
                 continue;
             };
-            msg_queue
+            if let Ok(_) = msg_queue
                 .0
                 .lock()
                 .expect("failed to acquire mutex")
-                .add((msg, token));
+                .add((msg, token)){
+                    error!("failed to add msg to buffer");
+                }
             msg_queue.1.notify_one();
         }
     }
@@ -50,11 +53,13 @@ impl SbMem {
 
 impl TCfeConnection for SbMem {
     fn send_message(&mut self, msg: &crate::msg::SbMsg) {
-        self.send
+        if let Ok(_) = self.send
             .0
             .lock()
             .expect("failed to acquire mutex")
-            .add(msg.clone());
+            .add(msg.clone()){
+                error!("failed to add msg to buffer");
+            }
         self.send.1.notify_one();
     }
 

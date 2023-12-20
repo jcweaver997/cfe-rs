@@ -1,9 +1,9 @@
 use std::{
-    thread::{park_timeout, sleep},
+    thread::sleep,
     time::{Duration, Instant},
 };
 
-use cfe::msg::{SbMsgData, SbEvent, EventSeverity};
+use cfe::msg::{EventSeverity, SbEvent, SbMsgData};
 
 pub struct Sch {
     pub cf: cfe::Cfe,
@@ -12,7 +12,11 @@ pub struct Sch {
 
 impl cfe::SbApp for Sch {
     fn init(&mut self) {
-        self.cf.log(SbEvent::AppInit, EventSeverity::Info, &format!("App {:?} initialized", self.cf.app_name));
+        self.cf.log(
+            SbEvent::AppInit,
+            EventSeverity::Info,
+            &format!("App {:?} initialized", self.cf.app_name),
+        );
     }
     fn start(&mut self) {
         let interval = Duration::from_millis(10);
@@ -26,7 +30,11 @@ impl cfe::SbApp for Sch {
                     next_time += interval;
                     skipped += 1;
                 }
-                self.cf.log(SbEvent::SchBroke(skipped), EventSeverity::Warn, &format!("sch behind, skipping {} cycles", skipped));
+                self.cf.log(
+                    SbEvent::SchBroke(skipped),
+                    EventSeverity::Warn,
+                    &format!("sch behind, skipping {} cycles", skipped),
+                );
             }
             sleep(next_time - now);
 
@@ -45,12 +53,10 @@ impl cfe::SbApp for Sch {
             }
             if self.out.perf.counter % 20 == 0 {
                 self.cf.send_message(SbMsgData::Sch5Hz);
-                
             }
             if self.out.perf.counter % 100 == 0 {
                 self.cf.send_message(SbMsgData::Sch1Hz);
             }
-            
 
             next_time += interval;
             self.out.perf.exit();
