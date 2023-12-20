@@ -33,8 +33,8 @@ impl SbUdp {
         loop {
             match u.recv(&mut packet) {
                 Err(e) => {
-                    if e.kind() != ErrorKind::WouldBlock {
-                        error!("received udp recv error {}", e);
+                    if e.kind() != ErrorKind::WouldBlock && e.kind() != ErrorKind::ConnectionReset {
+                        error!("received udp recv error {} {}", e, e.kind());
                     }
                 }
                 Ok(s) => {

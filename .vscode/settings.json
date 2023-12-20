@@ -3,6 +3,7 @@
         "./apps/sch/Cargo.toml",
         "./apps/example/Cargo.toml",
         "./apps/relay/Cargo.toml",
-        "./apps/ground/Cargo.toml"
+        "./apps/ground/Cargo.toml",
+        "./builds/fl/Cargo.toml"
     ]
 }

@@ -49,7 +49,7 @@ impl cfe::SbApp for Sch {
             }
             if self.out.perf.counter % 10 == 0 {
                 self.cf.send_message(SbMsgData::Sch10Hz);
-                self.cf.send_message(SbMsgData::SchOut(self.out.clone()));
+               
             }
             if self.out.perf.counter % 20 == 0 {
                 self.cf.send_message(SbMsgData::Sch5Hz);
@@ -57,6 +57,7 @@ impl cfe::SbApp for Sch {
             if self.out.perf.counter % 100 == 0 {
                 self.cf.send_message(SbMsgData::Sch1Hz);
             }
+            self.cf.send_message(SbMsgData::SchOut(self.out.clone()));
 
             next_time += interval;
             self.out.perf.exit();

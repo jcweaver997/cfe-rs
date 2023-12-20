@@ -9,7 +9,6 @@ use std::{
 };
 
 use chrono::Utc;
-use colored::Colorize;
 use log::*;
 use msg::{Computer, EventSeverity, SbEvent, SbMsg, SbMsgData, SbSubReq};
 use queues::{Buffer, IsQueue};
@@ -307,23 +306,23 @@ impl Cfe {
         match severity {
             EventSeverity::Trace if self.log_level <= EventSeverity::Trace => {
                 self.send_message(SbMsgData::TraceMsg(event.clone()));
-                println!("{} [{}] {}", time, "TRACE".bright_black(), text);
+                trace!("CFE {}", text);
             }
             EventSeverity::Debug if self.log_level <= EventSeverity::Debug => {
                 self.send_message(SbMsgData::DebugMsg(event.clone()));
-                println!("{} [{}] {}", time, "DEBUG".bright_cyan(), text);
+                debug!("CFE {}", text);
             }
             EventSeverity::Info if self.log_level <= EventSeverity::Info => {
                 self.send_message(SbMsgData::InfoMsg(event.clone()));
-                println!("{} [{}] {}", time, "INFO".blue(), text);
+                info!("CFE {}", text);
             }
             EventSeverity::Warn if self.log_level <= EventSeverity::Warn => {
                 self.send_message(SbMsgData::WarnMsg(event.clone()));
-                println!("{} [{}] {}", time, "WARN".yellow(), text);
+                warn!("CFE {}", text);
             }
             EventSeverity::Error if self.log_level <= EventSeverity::Error => {
                 self.send_message(SbMsgData::ErrorMsg(event.clone()));
-                println!("{} [{}] {}", time, "ERROR".red(), text);
+                error!("CFE {}", text);
             }
             _ => {}
         }

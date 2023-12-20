@@ -1,4 +1,4 @@
-use std::{io::ErrorKind, net::{SocketAddr, UdpSocket}, sync::{Arc, Mutex, Condvar}, thread::spawn, os::fd::{FromRawFd, AsRawFd}};
+use std::{io::ErrorKind, net::{SocketAddr, UdpSocket}, sync::{Arc, Mutex, Condvar}, thread::spawn};
 
 use log::*;
 use queues::{Buffer, IsQueue};
@@ -30,8 +30,8 @@ impl SbUdpServer {
         loop {
             match u.recv_from(&mut packet) {
                 Err(e) => {
-                    if e.kind() != ErrorKind::WouldBlock {
-                        error!("received udp recv error {}", e);
+                    if e.kind() != ErrorKind::WouldBlock && e.kind() != ErrorKind::ConnectionReset {
+                        error!("received udp recv error {} {}", e, e.kind());
                     }
                 }
                 Ok((s,remote_addr)) => {
@@ -48,6 +48,17 @@ impl SbUdpServer {
             }
         }
     }
+
+    #[cfg(target_os = "linux")]
+    fn clone_udp(&self) -> UdpSocket{
+        unsafe {UdpSocket::from_raw_fd(self.udp.as_raw_fd())}
+    }
+
+    #[cfg(target_os = "windows")]
+    fn clone_udp(&self) -> UdpSocket{
+        self.udp.try_clone().expect("failed to clone udp socket")
+    }
+
 }
 
 impl TCfeConnection for SbUdpServer {
@@ -74,7 +85,7 @@ impl TCfeConnection for SbUdpServer {
         msg_queue: Arc<(Mutex<Buffer<(SbMsg, usize)>>, Condvar)>,
         token: usize
     ) {
-        let u = unsafe {UdpSocket::from_raw_fd(self.udp.as_raw_fd())};
+        let u = self.clone_udp();
         let remote_addr = self.remote_addr.clone();
         spawn(move || Self::recv_thread(u, msg_queue, remote_addr, token));
     }
