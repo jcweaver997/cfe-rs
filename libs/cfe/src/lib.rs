@@ -306,23 +306,23 @@ impl Cfe {
         match severity {
             EventSeverity::Trace if self.log_level <= EventSeverity::Trace => {
                 self.send_message(SbMsgData::TraceMsg(event.clone()));
-                trace!("CFE {}", text);
+                trace!("{:?}.{:?}: {}", self.computer, self.app_name,text);
             }
             EventSeverity::Debug if self.log_level <= EventSeverity::Debug => {
                 self.send_message(SbMsgData::DebugMsg(event.clone()));
-                debug!("CFE {}", text);
+                debug!("{:?}.{:?}: {}", self.computer, self.app_name,text);
             }
             EventSeverity::Info if self.log_level <= EventSeverity::Info => {
                 self.send_message(SbMsgData::InfoMsg(event.clone()));
-                info!("CFE {}", text);
+                info!("{:?}.{:?}: {}", self.computer, self.app_name,text);
             }
             EventSeverity::Warn if self.log_level <= EventSeverity::Warn => {
                 self.send_message(SbMsgData::WarnMsg(event.clone()));
-                warn!("CFE {}", text);
+                warn!("{:?}.{:?}: {}", self.computer, self.app_name,text);
             }
             EventSeverity::Error if self.log_level <= EventSeverity::Error => {
                 self.send_message(SbMsgData::ErrorMsg(event.clone()));
-                error!("CFE {}", text);
+                error!("{:?}.{:?}: {}", self.computer, self.app_name,text);
             }
             _ => {}
         }

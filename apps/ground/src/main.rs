@@ -91,7 +91,6 @@ impl cfe::SbApp for Ground {
                 for v in flattened {
                     
                     if v.0.starts_with("data."){
-                        // info!("got data point: {} {}", v.0.chars().skip(5).collect::<String>(), v.1);
                         let now = chrono::Local::now();
                         telems.push(GroundTelemetryPoint {
                             remote_time: now.format("%G-%m-%dT%H:%M:%S.%f").to_string(),
@@ -119,17 +118,7 @@ impl cfe::SbApp for Ground {
                     }
                 }
 
-                // info!("telems {}", serde_json::to_string(&telems).unwrap());
-
-                let r = self.client.post("http://10.0.1.20:5900/api/Telemetry").json(&telems).send().unwrap();
-                // info!("got response: {:?}", r);
-
-                /*
-                
-                curl -X POST -H 'Content-Type: application/json' http://10.0.1.20:5900/api/Telemetry -d '[{"RemoteTime": "2023-12-20T12:43:20.123", "LocalTime": "2023-12-20T12:43:20.123",
-                 "Source":"cfe-rs", "App": "TESTAPP", "Name": "testPoint", "Sequence": 124, "Type": 10, "IntData": 45645, "FloatData": 45647.0,"StringData":"45645", "Severity": "INFO"}]
-'
-                 */
+                self.client.post("http://10.0.1.20:5900/api/Telemetry").json(&telems).send().unwrap();
             }
         }
     }
